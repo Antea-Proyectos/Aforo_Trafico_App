@@ -28,6 +28,7 @@ La aplicación integra modelos de visión artificial mediante **Python + YOLOv8*
 
 ## 📂 Estructura del proyecto
 
+```
 AforoTraficoApp/
 │
 ├── src/
@@ -47,6 +48,7 @@ AforoTraficoApp/
 ├── pom.xml                  # Configuración Maven
 ├── nbactions.xml            # Configuración NetBeans
 └── .gitignore
+```
 
 ---
 
@@ -85,7 +87,8 @@ AforoTraficoApp/python/
   → Debe colocarse en la raíz del proyecto.
 
 ---
-##️ Ejecución
+
+## Ejecución
 
 Desde NetBeans o desde terminal:
 

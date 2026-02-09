@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?><?import javafx.scene.layout.*?>
+
+<AnchorPane xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="com.mycompany.aforotraficoapp.ResultadosViewController"
+            prefWidth="900" prefHeight="700" stylesheets="@css/styles.css">
+
+    <children>
+        <VBox spacing="20" AnchorPane.topAnchor="10" AnchorPane.leftAnchor="10"
+              AnchorPane.rightAnchor="10" AnchorPane.bottomAnchor="10">
+
+            <Label text="Resumen Global" styleClass="label-titulo"/>
+            <TableView fx:id="tablaGlobal" prefHeight="160">
+                <columns>
+                    <TableColumn fx:id="colGlobalCampo" text="Campo" prefWidth="150" styleClass="columnaCampo"/>
+                    <TableColumn fx:id="colGlobalValor" text="Valor" prefWidth="100"/>
+                </columns>
+            </TableView>
+
+            <Label text="Resumen por Salidas" styleClass="label-titulo"/>
+            <TableView fx:id="tablaSalidas" prefHeight="160">
+                <columns>
+                    <TableColumn fx:id="colSalida" text="Salida" prefWidth="100" styleClass="columnaSalida"/>
+                    <TableColumn fx:id="colSalidaTotal" text="Total" prefWidth="80"/>
+                    <TableColumn fx:id="colSalidaLigero" text="Ligeros" prefWidth="80"/>
+                    <TableColumn fx:id="colSalidaPesado" text="Pesados" prefWidth="80"/>
+                </columns>
+            </TableView>
+
+            <Label text="Vehículos Individuales" styleClass="label-titulo"/>
+            <TableView fx:id="tablaVehiculos" prefHeight="350">
+                <columns>
+                    <TableColumn fx:id="colVehId" text="ID" prefWidth="60"/>
+                    <TableColumn fx:id="colVehClase" text="Clase" prefWidth="100"/>
+                    <TableColumn fx:id="colVehPeso" text="Peso" prefWidth="80"/>
+                    <TableColumn fx:id="colVehVelocidad" text="Velocidad" prefWidth="100"/>
+                </columns>
+            </TableView>
+
+        </VBox>
+    </children>
+</AnchorPane>

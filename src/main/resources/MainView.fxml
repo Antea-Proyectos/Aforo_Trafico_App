@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ProgressBar?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.AnchorPane?>
+<?import javafx.scene.layout.StackPane?>
+
+<AnchorPane id="AnchorPane" prefHeight="400.0" prefWidth="600.0" stylesheets="@css/styles.css" xmlns="http://javafx.com/javafx/25" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.mycompany.aforotraficoapp.Controller">
+
+    <children>
+        <!-- Fila 1 -->
+        <Button fx:id="btnSeleccionar" layoutX="108.0" layoutY="46.0" onAction="#seleccionarVideo" text="Seleccionar video" />
+        <TextField fx:id="txtRutaVideo" layoutX="229.0" layoutY="46.0" prefHeight="25.0" prefWidth="264.0" promptText="Ruta del video" />
+
+        <!-- Fila 2 -->
+        <Label layoutX="35.0" layoutY="123.0" text="Tipo de Carretera" />        
+        <ComboBox fx:id="comboTipo" layoutX="134.0" layoutY="119.0" prefWidth="200" />
+
+        <!-- Fila 3 -->
+        <Label fx:id="labelSalidas" layoutX="358.0" layoutY="123.0" prefHeight="17.0" prefWidth="183.0" text="Cuantas salidas se van a analizar?" visible="false" />
+        <TextField fx:id="txtNumeroSalidas" layoutX="537.0" layoutY="119.0" prefHeight="25.0" prefWidth="29.0" visible="false" />
+
+        <!-- Botón procesar -->
+        <Button fx:id="btnProcesar" layoutX="187.0" layoutY="308.0" onAction="#procesarVideo" prefHeight="25.0" prefWidth="92.0" styleClass="btn-procesar" text="Procesar" />
+
+        <!-- Progreso -->
+        <StackPane fx:id="panelProgreso" layoutX="205.0" layoutY="218.0" prefHeight="25" prefWidth="200" visible="false">
+            <ProgressBar fx:id="progreso" layoutX="262.0" layoutY="217.0" prefHeight="25" prefWidth="200" />
+            <Label fx:id="lblPorcentaje" layoutX="344.0" layoutY="221.0" styleClass="label-progreso" text="0%" />
+        </StackPane>
+        <Button fx:id="btnResultados" layoutX="305.0" layoutY="308.0" mnemonicParsing="false" onAction="#abrirVentanaResultados" styleClass="btn-resultados" text="Ver Resultados" />
+
+    </children>
+</AnchorPane>

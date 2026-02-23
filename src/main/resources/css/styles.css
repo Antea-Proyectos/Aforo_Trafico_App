@@ -42,3 +42,29 @@ Click nbfs://nbhost/SystemFileSystem/Templates/Other/CascadeStyleSheet.css to ed
     -fx-font-size: 14px;
     -fx-font-weight: bold;
 }
+
+.root-pane {
+    -fx-background-image: url("../img/Logo3.png");
+    -fx-background-repeat: no-repeat;
+    -fx-background-position: center 16%;
+    -fx-background-size: contain;
+}
+
+.menu-bar {
+    -fx-background-color: #ffffff;
+    -fx-border-color: #d0d0d0;
+    -fx-border-width: 0 0 1 0;
+}
+
+.menu-bar .label {
+    -fx-text-fill: #2c3e50;
+    -fx-font-weight: bold;
+}
+
+.menu:hover {
+    -fx-background-color: #e8eef3;
+}
+.logo-app {
+    -fx-fit-width: 80;
+    -fx-fit-height: 80;
+}

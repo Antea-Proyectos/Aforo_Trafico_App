@@ -1,5 +1,6 @@
 package com.mycompany.aforotraficoapp;
 
+import java.io.IOException;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
 import javafx.collections.*;
@@ -64,7 +65,7 @@ public class ResultadosViewController {
         colVehVelocidad.setCellValueFactory(data -> new ReadOnlyStringWrapper(data.getValue().get(3)));
     }
 
-    public void cargarJSON(String ruta) {
+    public void cargarJSONRotonda(String ruta) {
         try {
             String contenido = new String(Files.readAllBytes(Paths.get(ruta)));
             JSONObject json = new JSONObject(contenido);
@@ -120,5 +121,39 @@ public class ResultadosViewController {
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    public void cargarJSONCarretera(String ruta) throws IOException {
+        String contenido = new String(Files.readAllBytes(Paths.get(ruta)));
+        JSONObject json = new JSONObject(contenido);
+        // TABLA 1: RESUMEN GLOBAL
+        ObservableList<ObservableList<String>> filasGlobal = FXCollections.observableArrayList();
+
+        filasGlobal.add(FXCollections.observableArrayList("Total", json.get("aforo_total").toString()));
+        filasGlobal.add(FXCollections.observableArrayList("Ligeros", json.get("aforo_ligero").toString()));
+        filasGlobal.add(FXCollections.observableArrayList("Pesados", json.get("aforo_pesado").toString()));
+        filasGlobal.add(FXCollections.observableArrayList("Velocidad media (km/h)", json.get("velocidad_media_kmh").toString()));
+        filasGlobal.add(FXCollections.observableArrayList("Velocidad máxima (km/h)", json.get("velocidad_max_kmh").toString()));
+
+        tablaGlobal.setItems(filasGlobal);
+
+        // TABLA 2: SALIDAS → NO EXISTE EN CARRETERA
+        tablaSalidas.setItems(FXCollections.observableArrayList());
+
+        // TABLA 3: VEHÍCULOS
+        ObservableList<ObservableList<String>> filasVehiculos = FXCollections.observableArrayList();
+        JSONArray eventos = json.getJSONArray("events");
+
+        for (int i = 0; i < eventos.length(); i++) {
+            JSONObject v = eventos.getJSONObject(i);
+            filasVehiculos.add(FXCollections.observableArrayList(
+                    v.get("track_id").toString(),
+                    v.get("clase_nombre").toString(),
+                    v.get("peso").toString(),
+                    v.get("velocidad_kmh").toString()
+            ));
+        }
+
+        tablaVehiculos.setItems(filasVehiculos);
     }
 }

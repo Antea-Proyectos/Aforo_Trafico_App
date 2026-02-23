@@ -17,6 +17,7 @@ import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Label;
+import javafx.scene.control.MenuItem;
 import javafx.scene.control.ProgressBar;
 import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
@@ -38,10 +39,15 @@ public class Controller {
     private TextField txtRutaVideo;
     private String rutaVideo;
     @FXML
-    private TextField txtNumeroSalidas;
+    private Label labelAncho;
     @FXML
-    private Label labelSalidas;
-    private String numSalidas;
+    private TextField txtAnchoCarril;
+    private String carril;
+    @FXML
+    private Label labelDistancia;
+    @FXML
+    private TextField txtDistanciaLineas;
+    private String lineas;
     @FXML
     private ProgressBar progreso;
     @FXML
@@ -49,6 +55,8 @@ public class Controller {
     @FXML
     private Label lblPorcentaje;
     private String rutaJsonGenerado;
+    @FXML
+    private MenuItem menuVerVideo;
 
     /**
      * Initializes the controller class.
@@ -56,20 +64,34 @@ public class Controller {
     public void initialize() {
         comboTipo.setPromptText("Selecciona el tipo de carretera");
         comboTipo.getItems().addAll("Rotonda", "Carretera o Autopista Día", "Carretera o Autopista Noche");
-        comboTipo.valueProperty().addListener((obs, oldVal, newVal) -> {
-            if ("Rotonda".equals(newVal)) {
-                txtNumeroSalidas.setVisible(true);
-                labelSalidas.setVisible(true);
-            } else {
-                txtNumeroSalidas.setVisible(false);
-                labelSalidas.setVisible(false);
-            }
-        });
+
+        txtAnchoCarril.setVisible(false);
+        labelAncho.setVisible(false);
+        labelDistancia.setVisible(false);
+        txtDistanciaLineas.setVisible(false);
+
         panelProgreso.setVisible(false);
         btnResultados.setVisible(false);
         progreso.setProgress(0);
         lblPorcentaje.setText("0%");
+        menuVerVideo.setOnAction(e -> mostrarVideo());
 
+        comboTipo.valueProperty().addListener((obs, oldVal, newVal) -> {
+            boolean esRotonda = newVal != null && newVal.contains("Rotonda");
+
+            txtAnchoCarril.setVisible(!esRotonda);
+            txtDistanciaLineas.setVisible(!esRotonda);
+            labelAncho.setVisible(!esRotonda);
+            labelDistancia.setVisible(!esRotonda);
+        });
+    }
+
+    private void mostrarVideo() {
+        IntroVideoWindow intro = new IntroVideoWindow(() -> {
+            // No cambiamos preferencias aquí
+            System.out.println("Vídeo de ayuda finalizado");
+        });
+        intro.mostrar();
     }
 
     @FXML
@@ -94,7 +116,18 @@ public class Controller {
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/ResultadosView.fxml"));
             Parent root = loader.load();
             ResultadosViewController rc = loader.getController();
-            rc.cargarJSON(rutaJsonGenerado);
+
+            String tipo = comboTipo.getValue();
+            //////PRUEBA DESARROLLO BORRAR DESPUIES///////////////
+            ///
+//            String ruta = "C:/Users/nereatrillo/Downloads/resultados/2026_01_21_10_55_a_11_05_aforo.json";
+//            rc.cargarJSONCarretera(ruta);   // o cargarJSONRotonda(ruta)
+
+            if (tipo.contains("Rotonda")) {
+                rc.cargarJSONRotonda(rutaJsonGenerado);
+            } else {
+                rc.cargarJSONCarretera(rutaJsonGenerado);
+            }
             Stage stage = new Stage();
             stage.setTitle("Resultados del análisis de tráfico del video");
             stage.setScene(new Scene(root));
@@ -107,6 +140,7 @@ public class Controller {
 
     @FXML
     private void procesarVideo() {
+        String rutaJson;
         if (rutaVideo == null || rutaVideo.isEmpty()) {
             System.out.println("No se ha seleccionado ningún video");
             return;
@@ -125,8 +159,8 @@ public class Controller {
         String nombreVideo = new File(rutaVideo).getName();
         String nombreSinExtension = nombreVideo.substring(0, nombreVideo.lastIndexOf("."));
 
-        String rutaJson = System.getProperty("user.home")
-                + "/Downloads/resultados/" + nombreSinExtension + "_salidas.json";
+        rutaJson = System.getProperty("user.home")
+                + "/Downloads/resultados/" + nombreSinExtension + "_aforo.json";
 
         rutaJsonGenerado = rutaJson;
 
@@ -142,20 +176,16 @@ public class Controller {
                 String scriptPath;
 
                 String comando;
+                lineas = txtDistanciaLineas.getText();
+                carril = txtAnchoCarril.getText();
 
                 if (tipo.contains("Rotonda")) {
-                    numSalidas = txtNumeroSalidas.getText();
-                    if (numSalidas == null || numSalidas.isEmpty()) {
-                        System.out.println("Introduce el número de salidas");
-                        return;
-                    }
-
                     scriptPath = base + "/scripts/rotonda.py";
-                    comando = "\"" + pythonPath + "\" \"" + scriptPath + "\" \"" + rutaVideo + "\" " + numSalidas;
+                    comando = "\"" + pythonPath + "\" \"" + scriptPath + "\" \"" + rutaVideo;
 
                 } else { // Carretera
                     scriptPath = base + "/scripts/CodigoFinal.py";
-                    comando = "\"" + pythonPath + "\" \"" + scriptPath + "\" \"" + rutaVideo + "\"";
+                    comando = "\"" + pythonPath + "\" \"" + scriptPath + "\" \"" + rutaVideo + "\" \"" + lineas + "\" \"" + carril;
                 }
 
                 System.out.println("Ejecutando: " + comando);

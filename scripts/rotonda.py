@@ -2,71 +2,71 @@ from ultralytics import YOLO
 import cv2
 import numpy as np
 import json
-from collections import deque
-import os
-import sys
 from pathlib import Path
+import sys
+import os
 
 
-# ==========================
-# UTILIDADES GEOMÉTRICAS
-# ==========================
-def distancia_a_linea(cx, cy, linea):
-    (x1, y1), (x2, y2) = linea
-    num = abs((y2 - y1) * cx - (x2 - x1) * cy + x2 * y1 - y2 * x1)
-    den = ((x2 - x1) ** 2 + (y2 - y1) ** 2) ** 0.5
-    return num / den
+def dibujar_poligonos(video_path, titulo_ventana):
+    cap = cv2.VideoCapture(video_path)
+    ret, frame = cap.read()
+    cap.release()
+    if not ret:
+        raise RuntimeError("No se pudo leer el primer frame para dibujar zonas.")
 
+    dibujo = frame.copy()
+    poligonos = []
+    puntos_actual = []
 
-def cruza_segmento(p_prev, p_now, linea, tolerancia=12):
-    """
-    Detecta si el coche cruza la línea de salida aunque:
-    - el cruce ocurra fuera del segmento
-    - el cruce ocurra entre frames
-    - el cruce ocurra por el extremo
-    - la línea sea corta o inclinada
-    """
+    def click_event(event, x, y, flags, param):
+        nonlocal puntos_actual, dibujo
+        if event == cv2.EVENT_LBUTTONDOWN:
+            puntos_actual.append((x, y))
+            cv2.circle(dibujo, (x, y), 5, (0, 255, 0), -1)
+            if len(puntos_actual) > 1:
+                cv2.line(dibujo, puntos_actual[-2], puntos_actual[-1], (0, 255, 0), 2)
+            cv2.imshow(titulo_ventana, dibujo)
 
-    (x1, y1), (x2, y2) = linea
-    x3, y3 = p_prev
-    x4, y4 = p_now
+        elif event == cv2.EVENT_RBUTTONDOWN:
+            if len(puntos_actual) >= 3:
+                poligonos.append(np.array(puntos_actual, dtype=np.int32))
+                cv2.polylines(dibujo, [poligonos[-1]], True, (0, 255, 255), 2)
+            puntos_actual = []
+            cv2.imshow(titulo_ventana, dibujo)
 
-    # Vector de la línea
-    dxL = x2 - x1
-    dyL = y2 - y1
+    cv2.namedWindow(titulo_ventana)
+    cv2.putText(
+        dibujo,
+        "Izq=punto | Der=cerrar poligono | ENTER=terminar",
+        (30, 40),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.7,
+        (0, 255, 255),
+        2,
+    )
+    cv2.imshow(titulo_ventana, dibujo)
+    cv2.setMouseCallback(titulo_ventana, click_event)
 
-    # Vectores desde la línea a los puntos prev y now
-    dx1 = x3 - x1
-    dy1 = y3 - y1
-    dx2 = x4 - x1
-    dy2 = y4 - y1
+    while True:
+        key = cv2.waitKey(1) & 0xFF
+        if key in (13, 10):  # ENTER
+            break
 
-    # Producto cruzado (lado)
-    cross1 = dxL * dy1 - dyL * dx1
-    cross2 = dxL * dy2 - dyL * dx2
+    cv2.destroyAllWindows()
+    return poligonos
 
-    # 1) Cambio de lado → cruce real
-    if (cross1 > 0 and cross2 < 0) or (cross1 < 0 and cross2 > 0):
-        return True
+def dentro_poligono(cx, cy, poligono):
+    return cv2.pointPolygonTest(poligono, (cx, cy), False) >= 0
 
-    # 2) Si pasa muy cerca de la línea → también cuenta
-    dist_prev = distancia_a_linea(x3, y3, linea)
-    dist_now = distancia_a_linea(x4, y4, linea)
+def centroide(poligono):
+    M = cv2.moments(poligono)
+    if M["m00"] == 0:
+        return poligono[0][0], poligono[0][1]
+    cx = int(M["m10"] / M["m00"])
+    cy = int(M["m01"] / M["m00"])
+    return cx, cy
 
-    if dist_prev < tolerancia or dist_now < tolerancia:
-        return True
-
-    # 3) Si se aleja de la rotonda en dirección a la salida
-    if dist_now > dist_prev and dist_prev < tolerancia * 2:
-        return True
-
-    return False
-
-
-# ==========================
-# CALIBRACIONES
-# ==========================
-def calibrar_meter_per_pixel(video_path, metros_reales=5):
+def calibrar_meter_per_pixel(video_path, metros_reales=5, titulo_ventana="CALIBRAR ANCHO CARRIL"):
     cap = cv2.VideoCapture(video_path)
     ret, frame = cap.read()
     cap.release()
@@ -95,53 +95,21 @@ def calibrar_meter_per_pixel(video_path, metros_reales=5):
                     (255, 0, 0),
                     2,
                 )
-            cv2.imshow("CALIBRAR ANCHO CARRIL", frame)
+            cv2.imshow(titulo_ventana, frame)
 
-    cv2.namedWindow("CALIBRAR ANCHO CARRIL")
-    # ==========================
-    # INFO ARRIBA
-    # ==========================
-    cv2.rectangle(frame, (20, 30), (frame.shape[1] - 20, 160), (0, 0, 0), -1)
-    cv2.rectangle(frame, (20, 30), (frame.shape[1] - 20, 160), (0, 255, 255), 3)
+    cv2.namedWindow(titulo_ventana)
+    
     cv2.putText(
         frame,
-        "CALIBRAR ANCHO DEL CARRIL",
-        (60, 60),
+        "2 clicks sobre lineas que delimitan un carril | ENTER=terminar",
+        (30, 40),
         cv2.FONT_HERSHEY_SIMPLEX,
-        0.9,
+        0.7,
         (0, 255, 255),
         2,
     )
-    cv2.putText(
-        frame,
-        "Haz 2 clics sobre las lineas que delimitan un carril",
-        (60, 90),
-        cv2.FONT_HERSHEY_SIMPLEX,
-        0.7,
-        (255, 255, 255),
-        2,
-    )
-    cv2.putText(
-        frame,
-        f"para medir su ancho real. Distancia real= {metros_reales}m",
-        (60, 115),
-        cv2.FONT_HERSHEY_SIMPLEX,
-        0.7,
-        (255, 255, 255),
-        2,
-    )
-    cv2.putText(
-        frame,
-        "Pulsa ENTER al finalizar",
-        (60, 145),
-        cv2.FONT_HERSHEY_SIMPLEX,
-        0.7,
-        (0, 255, 0),
-        2,
-    )
-
-    cv2.setMouseCallback("CALIBRAR ANCHO CARRIL", click_event)
-    cv2.imshow("CALIBRAR ANCHO CARRIL", frame)
+    cv2.imshow(titulo_ventana, frame)
+    cv2.setMouseCallback(titulo_ventana, click_event)
 
     while True:
         key = cv2.waitKey(1) & 0xFF
@@ -157,165 +125,63 @@ def calibrar_meter_per_pixel(video_path, metros_reales=5):
     meter_per_pixel = metros_reales / dist_pix
     return meter_per_pixel
 
+def estabilizar_frame(prev_gray, curr_gray, prev_frame):
+    # Detectar puntos buenos en el frame anterior
+    prev_pts = cv2.goodFeaturesToTrack(prev_gray,
+                                       maxCorners=200,
+                                       qualityLevel=0.01,
+                                       minDistance=30,
+                                       blockSize=3)
 
-# ---------------------------
-# CALIBRAR SALIDAS
-# ---------------------------
-def calibrar_salidas(video_path, n_salidas):
-    """
-    Calibrar salidas de la rotonda:
-    - Pregunta cuántas salidas hay.
-    - Para cada salida: 2 clics sobre la línea de salida.
-    """
-    cap = cv2.VideoCapture(video_path)
-    ret, frame = cap.read()
-    cap.release()
-    if not ret:
-        raise RuntimeError(
-            "No se pudo leer el primer frame del vídeo para calibrar salidas."
-        )
+    if prev_pts is None:
+        return curr_gray, prev_frame  # no hay puntos, no estabilizamos
 
-    # while True:
-    #     try:
-    #         n_salidas = int(input("¿Cuántas salidas quieres marcar en la rotonda? "))
-    #         if n_salidas <= 0:
-    #             continue
-    #         break
-    #     except ValueError:
-    #         print("Introduce un número entero válido.")
+    # Calcular flujo óptico
+    curr_pts, status, _ = cv2.calcOpticalFlowPyrLK(prev_gray, curr_gray, prev_pts, None)
 
-    salidas = []
-    puntos_actual = []
-    salida_idx = 0
+    # Filtrar puntos válidos
+    idx = np.where(status == 1)[0]
+    prev_pts = prev_pts[idx]
+    curr_pts = curr_pts[idx]
 
-    def click_event(event, x, y, flags, param):
-        nonlocal salida_idx, puntos_actual
-        if event == cv2.EVENT_LBUTTONDOWN and salida_idx < n_salidas:
-            puntos_actual.append((x, y))
-            cv2.circle(frame, (x, y), 8, (0, 0, 255), -1)
-            if len(puntos_actual) == 2:
-                cv2.line(frame, puntos_actual[0], puntos_actual[1], (0, 0, 255), 3)
-                cv2.putText(
-                    frame,
-                    f"SALIDA {salida_idx+1}",
-                    (puntos_actual[0][0], puntos_actual[0][1] - 10),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.7,
-                    (0, 0, 255),
-                    2,
-                )
-                salidas.append((puntos_actual[0], puntos_actual[1]))
-                puntos_actual = []
-                salida_idx += 1
-            cv2.imshow("CALIBRAR SALIDAS", frame)
+    # Calcular transformación afín
+    m, _ = cv2.estimateAffinePartial2D(prev_pts, curr_pts)
 
-    cv2.namedWindow("CALIBRAR SALIDAS")
-    # ==========================
-    # INFO ABAJO A LA DERECHA
-    # ==========================
-    h, w = frame.shape[:2]
-    x1, y1 = w - 580, h - 280
-    x2, y2 = w - 20, h - 80
-    cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 0), -1)
-    cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 255), 2)
+    if m is None:
+        return curr_gray, prev_frame
 
-    cv2.putText(
-        frame,
-        "CALIBRAR SALIDAS ROTONDA",
-        (x1 + 10, y1 + 30),
-        cv2.FONT_HERSHEY_SIMPLEX,
-        0.7,
-        (0, 255, 255),
-        2,
-    )
-    cv2.putText(
-        frame,
-        "Haz 2 clics por cada salida sobre la linea de salida",
-        (x1 + 10, y1 + 60),
-        cv2.FONT_HERSHEY_SIMPLEX,
-        0.55,
-        (255, 255, 255),
-        2,
-    )
-    cv2.putText(
-        frame,
-        "Primero punto y luego punto opuesto",
-        (x1 + 10, y1 + 90),
-        cv2.FONT_HERSHEY_SIMPLEX,
-        0.55,
-        (255, 255, 255),
-        2,
-    )
-    cv2.putText(
-        frame,
-        f"Total salidas a marcar: {n_salidas}",
-        (x1 + 10, y1 + 120),
-        cv2.FONT_HERSHEY_SIMPLEX,
-        0.55,
-        (255, 255, 255),
-        2,
-    )
-    cv2.putText(
-        frame,
-        "Despues de cada salida, pulsa ENTER para finalizar",
-        (x1 + 10, y1 + 150),
-        cv2.FONT_HERSHEY_SIMPLEX,
-        0.55,
-        (0, 255, 0),
-        2,
-    )
+    # Aplicar transformación al frame actual
+    stabilized = cv2.warpAffine(prev_frame, m, (prev_frame.shape[1], prev_frame.shape[0]))
 
-    cv2.setMouseCallback("CALIBRAR SALIDAS", click_event)
-    cv2.imshow("CALIBRAR SALIDAS", frame)
-
-    while True:
-        key = cv2.waitKey(1) & 0xFF
-        # ENTER: 13 en Windows, 10 en Linux/macOS
-        if key in (13, 10):
-            break
-        # ESC para cancelar
-        if key == 27:
-            salidas = []
-            break
-
-    cv2.destroyAllWindows()
-
-    return salidas
+    return curr_gray, stabilized
 
 
-# ==========================
-# PROCESADO ROTONDA
-# ==========================
 def procesar_video_rotonda(
     video_path,
     output_json,
     output_video,
-    n_salidas,
-    max_segundos=60,
-    metros_reales_carril=5,
 ):
-    """
-    Procesa un vídeo de rotonda usando POLÍGONO:
-    - Calibra polígono de rotonda.
-    - Calibra salidas.
-    - Calibra metros/pixel.
-    - Detecta vehículos dentro y los que salen por cada salida.
-    - Calcula velocidades dentro y al salir.
-    """
-    salidas = calibrar_salidas(video_path, n_salidas)
-    METER_PER_PIXEL = calibrar_meter_per_pixel(
-        video_path, metros_reales=metros_reales_carril
-    )
+    print("Dibuja las ZONAS DE ENTRADA")
+    zonas_entrada = dibujar_poligonos(video_path, "ZONAS ENTRADA")
+
+    print("Dibuja las ZONAS DE SALIDA")
+    zonas_salida = dibujar_poligonos(video_path, "ZONAS SALIDA")
+    
+    print("Calibrar ANCHO DEL ARCEN") 
+    meter_per_pixel = calibrar_meter_per_pixel(video_path, metros_reales=5)
+
+    entradas_por_zona = [set() for _ in zonas_entrada]
+    salidas_por_zona = [set() for _ in zonas_salida]
+
+    pesos = {}  # track_id → ligero/pesado
 
     model = YOLO("yolov8s.pt")
     model.fuse()
 
     cap = cv2.VideoCapture(video_path)
-    w, h = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(
-        cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
-    )
+    w, h = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps = cap.get(cv2.CAP_PROP_FPS)
-    max_frames = int(fps * max_segundos)
+    max_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
     video_writer = None
     if output_video:
@@ -323,18 +189,25 @@ def procesar_video_rotonda(
             output_video, cv2.VideoWriter_fourcc(*"mp4v"), fps, (w, h)
         )
 
-    history = {}
-    eventos_salidas = []
-    aforo = []
-    salidas_detectadas_ = set()
-
     frame_idx = 0
+    prev_gray = None
+    
     while cap.isOpened():
         ret, frame = cap.read()
-        if not ret or frame_idx >= max_frames:
+        if not ret:
             break
         print(f"PROGRESS {frame_idx}/{max_frames}", flush=True)
 
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) 
+        # Estabilizar 
+        if prev_gray is None:
+            prev_gray = gray 
+            stabilized = frame.copy() 
+        else:
+            prev_gray, stabilized = estabilizar_frame(prev_gray, gray, frame) 
+        # Usar el frame estabilizado para TODO
+        frame = stabilized
+        
         results = model.track(
             frame,
             persist=True,
@@ -345,18 +218,18 @@ def procesar_video_rotonda(
         )
         annotated = results[0].plot() if video_writer else frame.copy()
 
-        # Dibujar salidas
-        for i, linea in enumerate(salidas, 1):
-            cv2.line(annotated, linea[0], linea[1], (0, 0, 255), 3)
-            cv2.putText(
-                annotated,
-                f"S{i}",
-                (linea[0][0], linea[0][1] - 10),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.7,
-                (0, 0, 255),
-                2,
-            )
+        # Dibujar polígonos
+        for idx, poly in enumerate(zonas_entrada, start=1):
+            cv2.polylines(annotated, [poly], True, (0, 255, 0), 2)
+            cx, cy = centroide(poly)
+            cv2.putText(annotated, f"Entrada {idx}", (cx, cy),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0,255,0), 2)
+
+        for idx, poly in enumerate(zonas_salida, start=1):
+            cv2.polylines(annotated, [poly], True, (0, 0, 255), 2)
+            cx, cy = centroide(poly)
+            cv2.putText(annotated, f"Salida {idx}", (cx, cy),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0,0,255), 2)
 
         if results[0].boxes is not None and results[0].boxes.id is not None:
             boxes = results[0].boxes.xyxy.cpu().numpy()
@@ -372,113 +245,73 @@ def procesar_video_rotonda(
                     continue
 
                 peso = "pesado" if nombre in ("bus", "truck") else "ligero"
-                # -----HISTORIAL--------
-                if track_id not in history:
-                    history[track_id] = deque(maxlen=10)
-                history[track_id].append((frame_idx, cx, cy))
-                # ------VELOCIDAD--------
-                if len(history[track_id]) >= 2:
-                    f1, x1h, y1h = history[track_id][-2]
-                    f2, x2h, y2h = history[track_id][-1]
+                pesos[track_id] = peso
 
-                    d_pix = np.hypot(x2h - x1h, y2h - y1h)
-                    dt = (f2 - f1) / fps if fps > 0 else 0
+                # ENTRADAS
+                for idx_z, poly in enumerate(zonas_entrada):
+                    if dentro_poligono(cx, cy, poly):
+                        entradas_por_zona[idx_z].add(track_id)
 
-                    if dt > 0 and d_pix >= 3:
-                        v_kmh = (d_pix * METER_PER_PIXEL / dt) * 3.6
-                        if 3 < v_kmh < 300:
-                            if (
-                                track_id not in aforo
-                                or v_kmh > aforo[track_id]["velocidad_kmh"]
-                            ):
-                                aforo.append(
-                                    {
-                                        "track_id": int(track_id),
-                                        "clase_nombre": nombre,
-                                        "peso": peso,
-                                        "velocidad_kmh": round(v_kmh, 1),
-                                        "timestamp_s": round(frame_idx / fps, 1),
-                                    }
-                                )
-                    # ------DETECCIÓN SALIDA--------
-                    for idx_s, linea in enumerate(salidas, 1):
-                        if (track_id, idx_s) in salidas_detectadas_:
-                            continue
-                        if cruza_segmento((x1h, y1h), (x2h, y2h), linea):
-
-                            eventos_salidas.append(
-                                {
-                                    "salida": idx_s,
-                                    "track_id": int(track_id),
-                                    "peso": peso,
-                                }
-                            )
-                            salidas_detectadas_.add((track_id, idx_s))
+                # SALIDAS
+                for idx_z, poly in enumerate(zonas_salida):
+                    if dentro_poligono(cx, cy, poly):
+                        salidas_por_zona[idx_z].add(track_id)
 
                 cv2.circle(annotated, (int(cx), int(cy)), 6, (255, 255, 255), 2)
 
         if video_writer:
             video_writer.write(annotated)
 
+        # cv2.imshow("LIVE", annotated)
+        # if cv2.waitKey(1) & 0xFF == 27:
+        #     break
+
         frame_idx += 1
 
     cap.release()
     if video_writer:
         video_writer.release()
+    cv2.destroyAllWindows()
 
     # ==========================
-    # POST-PROCESADO FINAL
+    # RESÚMENES
     # ==========================
 
-    # 1. Aforo total: velocidad máxima por track_id
-    def filtrar_max_por_track(lista_eventos):
-        res = {}
-        for e in lista_eventos:
-            tid = e["track_id"]
-            if tid not in res or e["velocidad_kmh"] > res[tid]["velocidad_kmh"]:
-                res[tid] = e
-        return res
-
-    aforo_total = filtrar_max_por_track(aforo)
-
-    # 2. Filtrar eventos de salida solo para construir el resumen
-    def filtrar_unico_evento(eventos):
-        res = {}
-        for e in eventos:
-            tid = e["track_id"]
-            if tid not in res:
-                res[tid] = e
-        return list(res.values())
-
-    eventos_salidas_filtrado = filtrar_unico_evento(eventos_salidas)
-
-    # 3. Resumen por salida
-    resumen_salidas = {}
-    for i, _ in enumerate(salidas, 1):
-        eventos_s_i = [e for e in eventos_salidas_filtrado if e["salida"] == i]
-        resumen_salidas[f"salida_{i}"] = {
-            "total": len(eventos_s_i),
-            "ligero": sum(1 for e in eventos_s_i if e["peso"] == "ligero"),
-            "pesado": sum(1 for e in eventos_s_i if e["peso"] == "pesado"),
-        }
-
-    # 4. Resumen global
-    aforo_lista = list(aforo_total.values())
-    total = len(aforo_lista)
-    ligeros = sum(1 for e in aforo_lista if e["peso"] == "ligero")
-    pesados = sum(1 for e in aforo_lista if e["peso"] == "pesado")
+    # IDs que han pasado por alguna zona
+    ids_global = set().union(*entradas_por_zona, *salidas_por_zona)
 
     resumen_global = {
-        "total": total,
-        "ligero": ligeros,
-        "pesado": pesados,
+        "total": len(ids_global),
+        "ligero": sum(1 for tid in ids_global if pesos.get(tid) == "ligero"),
+        "pesado": sum(1 for tid in ids_global if pesos.get(tid) == "pesado"),
     }
 
-    # Resultado final
+    entradas_resumen = []
+    for idx, zona in enumerate(entradas_por_zona, start=1):
+        ids = list(zona)
+        entradas_resumen.append({
+            "zona": idx,
+            "total": len(ids),
+            "ligero": sum(1 for tid in ids if pesos.get(tid) == "ligero"),
+            "pesado": sum(1 for tid in ids if pesos.get(tid) == "pesado"),
+            "track_ids": ids
+        })
+
+    salidas_resumen = []
+    for idx, zona in enumerate(salidas_por_zona, start=1):
+        ids = list(zona)
+        salidas_resumen.append({
+            "zona": idx,
+            "total": len(ids),
+            "ligero": sum(1 for tid in ids if pesos.get(tid) == "ligero"),
+            "pesado": sum(1 for tid in ids if pesos.get(tid) == "pesado"),
+            "track_ids": ids
+        })
+
     resultado = {
         "resumen_global": resumen_global,
-        "resumen_salidas": resumen_salidas,
-        "aforo_total": list(aforo_total.values()),
+        "entradas": entradas_resumen,
+        "salidas": salidas_resumen,
     }
 
     with open(output_json, "w", encoding="utf-8") as f:
@@ -487,52 +320,19 @@ def procesar_video_rotonda(
     return resultado
 
 
-# ==========================
-# USO MÚLTIPLES VÍDEOS
-# ==========================
-# if __name__ == "__main__":
-#     videos = [
-#         "videos/GOPR0035.mp4",
-#         # "videos/rotonda2.mp4",
-#     ]
-
-#     os.makedirs("resultados", exist_ok=True)
-
-#     for i, video_path in enumerate(videos, 1):
-#         procesar_video_rotonda(
-#             video_path=video_path,
-#             output_json=f"resultados/rotonda_aforo_velocidades_{i}.json",
-#             output_video=f"resultados/rotonda_salida_anotada_{i}.mp4",
-#             max_segundos=60,
-#             metros_reales_carril=5,
-#         )
-
-#     print("\n🎉 TODAS LAS ROTONDAS PROCESADAS!")
 if __name__ == "__main__":
-    import sys
-    from pathlib import Path
-    import os
-
-    # Ruta del vídeo que viene desde Java
     video_path = sys.argv[1]
-    n_salidas = int(sys.argv[2])
 
-    # Carpeta de resultados en Downloads
     downloads = Path.home() / "Downloads"
     carpeta = downloads / "resultados"
     carpeta.mkdir(exist_ok=True)
 
-    # Nombre del JSON según el vídeo
     nombre = Path(video_path).stem
-    output_json = carpeta / f"{nombre}_salidas.json"
-    output_video = carpeta / f"{nombre}_salida_anotada.mp4"
+    output_json = carpeta / f"{nombre}_aforo.json"
+    output_video = carpeta / f"{nombre}_anotado.mp4"
 
-    # Procesar el vídeo
     procesar_video_rotonda(
         video_path=video_path,
-        n_salidas=n_salidas,
         output_json=str(output_json),
         output_video=str(output_video),
-        max_segundos=60,
-        metros_reales_carril=5,
     )

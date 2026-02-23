@@ -1,5 +1,4 @@
 import json
-import os
 import sys
 from collections import defaultdict, deque
 from pathlib import Path
@@ -10,9 +9,6 @@ from ultralytics import YOLO
 
 
 def calibrar_homografia(video_path, ancho_lineas, ancho_carril, titulo_ventana="CALIBRAR EJE X E Y"):
-    print("Ruta recibida:", video_path)
-    print("Existe el archivo?:", os.path.exists(video_path))
-
     cap = cv2.VideoCapture(video_path)
     ret, frame = cap.read()
     cap.release()
@@ -127,9 +123,9 @@ def calibrar_homografia(video_path, ancho_lineas, ancho_carril, titulo_ventana="
     pA = np.array([Ax, Ay, 1.0])
     pB = np.array([Bx, By, 1.0])
     # TRANSFORMAR PUNTOS OCN HOMOGRAFÍA PROVISIONAL
-    PA = H @ pA;
+    PA = H @ pA
     PA /= PA[2]
-    PB = H @ pB;
+    PB = H @ pB
     PB /= PB[2]
     # DISTANCIA EN EL PLANO FALSO
     dX_calc = abs(PB[0] - PA[0])
@@ -142,9 +138,9 @@ def calibrar_homografia(video_path, ancho_lineas, ancho_carril, titulo_ventana="
     pE = np.array([Ex, Ey, 1.0])
     pF = np.array([Fx, Fy, 1.0])
 
-    PE = H @ pE;
+    PE = H @ pE
     PE /= PE[2]
-    PF = H @ pF;
+    PF = H @ pF
     PF /= PF[2]
 
     dY_calc = abs(PF[1] - PE[1])
@@ -236,7 +232,7 @@ def punto_entre_lineas(cx, cy, linea1, linea2):
     return ymin <= cy <= ymax
 
 
-def procesar_video_trafico(video_path, ancho_lineas, ancho_carril, output_json, output_video=None, max_segundos=20):
+def procesar_video_trafico(video_path, ancho_lineas, ancho_carril, output_json, output_video=None, max_segundos=306):
     # === 1.CALIBRACIÓN ===
     linea1, linea2, poligono_carretera = dibujar_poligonos(video_path)
     zona_trafico = (linea1, linea2)
@@ -251,10 +247,7 @@ def procesar_video_trafico(video_path, ancho_lineas, ancho_carril, output_json, 
         cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
     )
     fps = cap.get(cv2.CAP_PROP_FPS)
-    ####PARA TESTEAR, BORRAR LUEGO#####
-    # NUEVO: Límite de frames para max_segundos
-    max_frames = int(fps * max_segundos)
-    ####################################
+
     video_writer = None
     if output_video:
         video_writer = cv2.VideoWriter(
@@ -356,7 +349,7 @@ def procesar_video_trafico(video_path, ancho_lineas, ancho_carril, output_json, 
                         d_metros = np.hypot(dx_m, dy_m)
                         v_kmh = (d_metros / dt) * 3.6
 
-                        if v_kmh >= 10 and v_kmh <= 150:
+                        if 10 <= v_kmh <= 150:
                             peso = "pesado" if nombre in ("bus", "truck") else "ligero"
                             events.append(
                                 {
@@ -448,6 +441,6 @@ if __name__ == "__main__":
         ancho_carril=carril,
         output_json=str(json_salida),
         output_video=str(video_salida),
-        max_segundos=20,
+        max_segundos=306,
     )
     print("\n🎉 TODOS LOS VÍDEOS PROCESADOS!")

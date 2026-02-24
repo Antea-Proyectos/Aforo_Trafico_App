@@ -15,23 +15,18 @@ public class Main extends Application {
     public void start(Stage stage) throws Exception {
 
         Preferences prefs = Preferences.userNodeForPackage(Main.class);
-        boolean introMostrada = prefs.getBoolean("intro_mostrada", true);
+        boolean introMostrada = prefs.getBoolean("intro_mostrada", false);
+         
+        if (!introMostrada) {
+            // Mostrar ventana emergente con vídeo
             IntroVideoWindow intro = new IntroVideoWindow(() -> {
                 prefs.putBoolean("intro_mostrada", true);
                 mostrarVentanaPrincipal(stage);
             });
             intro.mostrar();
-
-//        if (!introMostrada) {
-//            // Mostrar ventana emergente con vídeo
-//            IntroVideoWindow intro = new IntroVideoWindow(() -> {
-//                prefs.putBoolean("intro_mostrada", true);
-//                mostrarVentanaPrincipal(stage);
-//            });
-//            intro.mostrar();
-//        } else {
-//            mostrarVentanaPrincipal(stage);
-//        }
+        } else {
+            mostrarVentanaPrincipal(stage);
+        }
     }
 
     private void mostrarVentanaPrincipal(Stage stage) {

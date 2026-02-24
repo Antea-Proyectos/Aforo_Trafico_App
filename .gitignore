@@ -1,4 +1,4 @@
 target/
 *.pt
 python/
-src/main/resources/videos/
+src\main\resources\videos

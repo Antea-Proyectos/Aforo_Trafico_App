@@ -94,3 +94,8 @@ Desde NetBeans o desde terminal:
 
 ```bash
 mvn javafx:run
+```
+---
+## Licencia
+
+Este proyecto se distribuye bajo la licencia **GNU**. Consulta [LICENSE](LICENSE).
